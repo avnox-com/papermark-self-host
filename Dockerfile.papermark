@@ -1,0 +1,166 @@
+# syntax=docker/dockerfile:1
+
+# ============================================================================
+# Papermark Self-Hosted Dockerfile
+# ============================================================================
+# This Dockerfile builds Papermark, the open-source DocSend alternative
+# Based on Next.js with PostgreSQL, S3-compatible storage, and Resend for email
+# ============================================================================
+
+ARG NODE_VERSION=18
+ARG ALPINE_VERSION=3.19
+
+# ============================================================================
+# Stage 1: Dependencies
+# ============================================================================
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS deps
+
+RUN apk add --no-cache libc6-compat openssl
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
+
+# Install dependencies based on the preferred package manager
+RUN \
+  if [ -f yarn.lock ]; then \
+    yarn --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then \
+    npm ci; \
+  elif [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm i --frozen-lockfile; \
+  else \
+    echo "Lockfile not found." && exit 1; \
+  fi
+
+# ============================================================================
+# Stage 2: Build
+# ============================================================================
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS builder
+
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Set environment variables for build
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Copy next.config override if exists, otherwise use original
+# This allows customization for Docker builds
+COPY --chown=node:node next.config.docker.js* ./next.config.docker.js
+RUN if [ -f next.config.docker.js ]; then \
+      cp next.config.js next.config.original.js || true; \
+      cp next.config.docker.js next.config.js; \
+    fi
+
+# Build the application
+# Note: Some env vars need to be present at build time for Next.js
+# Set dummy values for build - real values come from environment at runtime
+ENV NEXT_PUBLIC_BASE_URL=http://localhost:3000
+ENV NEXTAUTH_URL=http://localhost:3000
+ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
+
+RUN \
+  if [ -f yarn.lock ]; then \
+    yarn build; \
+  elif [ -f package-lock.json ]; then \
+    npm run build; \
+  elif [ -f pnpm-lock.yaml ]; then \
+    corepack enable pnpm && pnpm build; \
+  else \
+    echo "Lockfile not found." && exit 1; \
+  fi
+
+# ============================================================================
+# Stage 3: Production Runtime
+# ============================================================================
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS runner
+
+WORKDIR /app
+
+# Create non-root user for running the app
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    libc6-compat \
+    openssl \
+    curl \
+    bash
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Copy built application
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# Copy Prisma schema and migrations
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+# Copy startup script
+COPY --chmod=755 <<'EOF' /app/docker-entrypoint.sh
+#!/bin/bash
+set -e
+
+echo "======================================"
+echo "Papermark Self-Hosted Startup"
+echo "======================================"
+
+# Wait for database to be ready
+if [ -n "$DATABASE_URL" ]; then
+    echo "Waiting for database to be ready..."
+    max_attempts=30
+    attempt=0
+    until npx prisma db push --skip-generate || [ $attempt -eq $max_attempts ]; do
+        attempt=$((attempt + 1))
+        echo "Database not ready, attempt $attempt/$max_attempts..."
+        sleep 2
+    done
+    
+    if [ $attempt -eq $max_attempts ]; then
+        echo "ERROR: Could not connect to database after $max_attempts attempts"
+        exit 1
+    fi
+    
+    echo "✅ Database connection established"
+    
+    # Run migrations
+    echo "Running database migrations..."
+    npx prisma db push --skip-generate || true
+    
+    echo "✅ Database setup complete"
+fi
+
+echo "======================================"
+echo "Starting Papermark..."
+echo "======================================"
+
+exec node server.js
+EOF
+
+# Set proper permissions
+RUN chown -R nextjs:nodejs /app
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

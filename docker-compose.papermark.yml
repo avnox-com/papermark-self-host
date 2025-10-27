@@ -1,0 +1,333 @@
+version: "3.8"
+
+# ============================================================================
+# Papermark Self-Hosted Docker Swarm Stack
+# ============================================================================
+# Complete production stack with PostgreSQL, Redis, and Traefik integration
+# Optimized for Docker Swarm deployment
+# ============================================================================
+
+x-deploy-defaults: &deploy-defaults
+  mode: replicated
+  replicas: 1
+  update_config:
+    parallelism: 1
+    delay: 10s
+    failure_action: rollback
+    order: start-first
+  rollback_config:
+    parallelism: 1
+    delay: 5s
+  restart_policy:
+    condition: on-failure
+    delay: 5s
+    max_attempts: 3
+    window: 120s
+
+x-logging-defaults: &logging-defaults
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+networks:
+  traefik_public:
+    external: true
+  papermark_internal:
+    driver: overlay
+    attachable: true
+    internal: false
+
+volumes:
+  papermark_postgres_data:
+    driver: local
+  papermark_redis_data:
+    driver: local
+  papermark_uploads:
+    driver: local
+
+services:
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    networks:
+      - papermark_internal
+    volumes:
+      - papermark_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-papermark}
+      POSTGRES_USER: ${POSTGRES_USER:-papermark}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.utf8"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-papermark}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      <<: *deploy-defaults
+      placement:
+        constraints:
+          - node.labels.papermark.postgres == true
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging: *logging-defaults
+
+  # ==========================================================================
+  # Redis Cache (Optional but recommended)
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    networks:
+      - papermark_internal
+    volumes:
+      - papermark_redis_data:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      <<: *deploy-defaults
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging: *logging-defaults
+
+  # ==========================================================================
+  # Papermark Application
+  # ==========================================================================
+  papermark:
+    image: ${PAPERMARK_IMAGE:-ghcr.io/your-org/papermark:latest}
+    networks:
+      - traefik_public
+      - papermark_internal
+    volumes:
+      - papermark_uploads:/app/uploads
+    environment:
+      # ======================================================================
+      # Core Configuration
+      # ======================================================================
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      
+      # ======================================================================
+      # Application URLs
+      # ======================================================================
+      NEXT_PUBLIC_BASE_URL: ${PAPERMARK_PUBLIC_URL:?PAPERMARK_PUBLIC_URL is required}
+      NEXTAUTH_URL: ${PAPERMARK_PUBLIC_URL:?PAPERMARK_PUBLIC_URL is required}
+      
+      # ======================================================================
+      # Security
+      # ======================================================================
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required}
+      
+      # ======================================================================
+      # Database Configuration
+      # ======================================================================
+      DATABASE_URL: postgresql://${POSTGRES_USER:-papermark}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-papermark}?schema=public&connect_timeout=30&pool_timeout=30&socket_timeout=30
+      POSTGRES_PRISMA_URL: postgresql://${POSTGRES_USER:-papermark}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-papermark}?schema=public&pgbouncer=true&connect_timeout=15
+      POSTGRES_URL_NON_POOLING: postgresql://${POSTGRES_USER:-papermark}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-papermark}?schema=public
+      
+      # ======================================================================
+      # Redis Configuration (Optional)
+      # ======================================================================
+      REDIS_URL: redis://redis:6379
+      UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:-}
+      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-}
+      
+      # ======================================================================
+      # Storage Configuration (S3-compatible)
+      # Choose ONE of the following storage options:
+      # ======================================================================
+      
+      # Option 1: AWS S3
+      BLOB_STORAGE_TYPE: ${BLOB_STORAGE_TYPE:-s3}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME:-}
+      
+      # Option 2: Vercel Blob (if using Vercel Blob)
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN:-}
+      
+      # Option 3: MinIO or other S3-compatible
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      
+      # ======================================================================
+      # Authentication Providers
+      # ======================================================================
+      
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      
+      # GitHub OAuth
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      
+      # ======================================================================
+      # Email Configuration (Resend)
+      # ======================================================================
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@yourdomain.com}
+      
+      # ======================================================================
+      # Analytics (Tinybird - Optional)
+      # ======================================================================
+      TINYBIRD_TOKEN: ${TINYBIRD_TOKEN:-}
+      TINYBIRD_API_URL: ${TINYBIRD_API_URL:-https://api.tinybird.co}
+      
+      # ======================================================================
+      # Stripe (Optional - for payments)
+      # ======================================================================
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
+      
+      # ======================================================================
+      # Feature Flags
+      # ======================================================================
+      NEXT_PUBLIC_ENABLE_ANALYTICS: ${ENABLE_ANALYTICS:-true}
+      NEXT_PUBLIC_ENABLE_CUSTOM_DOMAINS: ${ENABLE_CUSTOM_DOMAINS:-false}
+      
+      # ======================================================================
+      # Vercel Integration (Optional)
+      # ======================================================================
+      PROJECT_ID_VERCEL: ${PROJECT_ID_VERCEL:-}
+      TEAM_ID_VERCEL: ${TEAM_ID_VERCEL:-}
+      AUTH_BEARER_TOKEN: ${AUTH_BEARER_TOKEN:-}
+      
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      <<: *deploy-defaults
+      replicas: ${PAPERMARK_REPLICAS:-2}
+      labels:
+        # Traefik configuration
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik_public"
+        
+        # HTTP Router
+        - "traefik.http.routers.papermark.rule=Host(`${PAPERMARK_DOMAIN:?PAPERMARK_DOMAIN is required}`)"
+        - "traefik.http.routers.papermark.entrypoints=websecure"
+        - "traefik.http.routers.papermark.tls=true"
+        - "traefik.http.routers.papermark.tls.certresolver=letsencrypt"
+        
+        # Service
+        - "traefik.http.services.papermark.loadbalancer.server.port=3000"
+        - "traefik.http.services.papermark.loadbalancer.server.scheme=http"
+        - "traefik.http.services.papermark.loadbalancer.sticky.cookie=true"
+        - "traefik.http.services.papermark.loadbalancer.sticky.cookie.name=papermark_affinity"
+        - "traefik.http.services.papermark.loadbalancer.sticky.cookie.httponly=true"
+        - "traefik.http.services.papermark.loadbalancer.sticky.cookie.secure=true"
+        
+        # Health check
+        - "traefik.http.services.papermark.loadbalancer.healthcheck.path=/api/health"
+        - "traefik.http.services.papermark.loadbalancer.healthcheck.interval=30s"
+        - "traefik.http.services.papermark.loadbalancer.healthcheck.timeout=5s"
+        
+        # Middleware - Security Headers
+        - "traefik.http.middlewares.papermark-headers.headers.customResponseHeaders.X-Frame-Options=SAMEORIGIN"
+        - "traefik.http.middlewares.papermark-headers.headers.customResponseHeaders.X-Content-Type-Options=nosniff"
+        - "traefik.http.middlewares.papermark-headers.headers.customResponseHeaders.X-XSS-Protection=1; mode=block"
+        - "traefik.http.middlewares.papermark-headers.headers.customResponseHeaders.Referrer-Policy=strict-origin-when-cross-origin"
+        
+        # Middleware - Rate Limiting
+        - "traefik.http.middlewares.papermark-ratelimit.ratelimit.average=100"
+        - "traefik.http.middlewares.papermark-ratelimit.ratelimit.burst=200"
+        - "traefik.http.middlewares.papermark-ratelimit.ratelimit.period=1m"
+        
+        # Middleware - Compression
+        - "traefik.http.middlewares.papermark-compress.compress=true"
+        
+        # Apply middlewares
+        - "traefik.http.routers.papermark.middlewares=papermark-headers,papermark-ratelimit,papermark-compress"
+        
+        # HTTP to HTTPS redirect
+        - "traefik.http.routers.papermark-http.rule=Host(`${PAPERMARK_DOMAIN}`)"
+        - "traefik.http.routers.papermark-http.entrypoints=web"
+        - "traefik.http.routers.papermark-http.middlewares=papermark-redirect"
+        - "traefik.http.middlewares.papermark-redirect.redirectscheme.scheme=https"
+        - "traefik.http.middlewares.papermark-redirect.redirectscheme.permanent=true"
+      
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+      
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+        monitor: 30s
+    
+    logging: *logging-defaults
+
+  # ==========================================================================
+  # PostgreSQL Backup (Optional but recommended)
+  # ==========================================================================
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    networks:
+      - papermark_internal
+    volumes:
+      - ${BACKUP_PATH:-./backups}:/backups
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-papermark}
+      POSTGRES_USER: ${POSTGRES_USER:-papermark}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SCHEDULE: ${BACKUP_SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-4}
+      BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-6}
+      HEALTHCHECK_PORT: 8080
+    depends_on:
+      - postgres
+    deploy:
+      <<: *deploy-defaults
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.papermark.backup == true
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    logging: *logging-defaults

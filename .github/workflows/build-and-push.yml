@@ -1,0 +1,162 @@
+name: Build & Push Papermark
+
+on:
+  push:
+    branches: ["main", "master"]
+  schedule:
+    - cron: "15 5 * * */3" # At 05:15 on every 3rd day-of-week
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: ${{ secrets.REGISTRY }} # e.g. ghcr.io
+  REGISTRY_IP: ${{ secrets.REGISTRY_IP }} # optional: pin host->IP through WG
+  IMAGE_PREFIX: ${{ secrets.IMAGE_PREFIX }} # e.g. ghcr.io/your-org
+  PAPERMARK_REPO: mfts/papermark
+  PAPERMARK_REF: main
+  PAPERMARK_PRS: "" # e.g. "123,456" (leave empty to skip)
+  WORKFLOW_TARGET_DIR: stacks/projects/papermark # no trailing slash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout (this repo)
+        uses: actions/checkout@v4
+
+      - name: Checkout Papermark upstream
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PAPERMARK_REPO }}
+          ref: ${{ env.PAPERMARK_REF }}
+          path: ${{ env.WORKFLOW_TARGET_DIR }}/papermark-src
+          fetch-depth: 0 # IMPORTANT: we need history to merge PRs
+
+      - name: Apply selected PRs onto Papermark
+        if: ${{ env.PAPERMARK_PRS != '' }}
+        working-directory: ${{ env.WORKFLOW_TARGET_DIR }}/papermark-src
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra PRS <<< "${PAPERMARK_PRS}"
+          git config user.email "ci@github"
+          git config user.name "GitHub Actions"
+          for PR in "${PRS[@]}"; do
+            echo "==> Fetching PR #${PR}"
+            git fetch origin "pull/${PR}/head:pr-${PR}"
+            git merge --no-ff --no-edit "pr-${PR}"
+          done
+          echo "==> Resulting HEAD:"
+          git --no-pager log --oneline -n 5
+
+      - name: Set short SHA
+        id: vars
+        run: echo "sha=${GITHUB_SHA::12}" >> $GITHUB_OUTPUT
+
+      - name: Docker setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Docker setup Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      # -------- Build Papermark application --------
+      - name: Build Papermark
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.WORKFLOW_TARGET_DIR }}/papermark-src
+          file: ${{ env.WORKFLOW_TARGET_DIR }}/Dockerfile.papermark
+          push: false
+          load: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/papermark:sha-${{ steps.vars.outputs.sha }}
+            ${{ env.IMAGE_PREFIX }}/papermark:latest
+          provenance: false
+          sbom: false
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            NODE_VERSION=18
+          cache-from: type=gha,scope=papermark-app
+          cache-to: type=gha,mode=max,scope=papermark-app
+
+      # -------- Optional: WireGuard setup --------
+      - name: Install WireGuard tools (if needed)
+        if: ${{ secrets.WG_CONF != '' }}
+        run: |
+          set -o errexit -o pipefail -o nounset
+
+          # Keep the UI alive while apt works
+          ( while sleep 20; do echo "::notice::Installing wireguard-tools... still running"; done ) &
+          HB=$!
+
+          sudo apt-get update \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30
+
+          sudo timeout 5m sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+            -o Dpkg::Use-Pty=0 \
+            wireguard-tools
+
+          kill $HB || true
+          wg --version || true
+
+      - name: Configure & bring up WireGuard
+        if: ${{ secrets.WG_CONF != '' }}
+        env:
+          WG_CONF: ${{ secrets.WG_CONF }}
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /etc/wireguard
+          echo "${WG_CONF}" | sudo tee /etc/wireguard/wg0.conf >/dev/null
+          sudo chmod 600 /etc/wireguard/wg0.conf
+          sudo timeout 20s wg-quick up wg0 || true
+
+          for i in {1..30}; do
+            if ip link show wg0 >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [ -n "${REGISTRY_IP:-}" ]; then
+            echo "${REGISTRY_IP} ${REGISTRY}" | sudo tee -a /etc/hosts
+          fi
+
+          echo "WireGuard status:"
+          sudo wg show
+
+      - name: Docker login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Push Papermark image
+        run: |
+          set -e
+          docker push "${IMAGE_PREFIX}/papermark:sha-${{ steps.vars.outputs.sha }}"
+          docker push "${IMAGE_PREFIX}/papermark:latest"
+
+      - name: Teardown WireGuard
+        if: always() && secrets.WG_CONF != ''
+        run: |
+          sudo timeout 10s wg-quick down wg0 || true
+
+      - name: Summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Papermark built successfully**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${IMAGE_PREFIX}/papermark:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA Tag**: \`${IMAGE_PREFIX}/papermark:sha-${{ steps.vars.outputs.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source**: \`${PAPERMARK_REPO}@${PAPERMARK_REF}\`" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${PAPERMARK_PRS}" ]; then
+            echo "- **PRs Applied**: ${PAPERMARK_PRS}" >> $GITHUB_STEP_SUMMARY
+          fi

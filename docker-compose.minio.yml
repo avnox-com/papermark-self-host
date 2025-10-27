@@ -1,0 +1,130 @@
+version: "3.8"
+
+# ============================================================================
+# Papermark Self-Hosted with MinIO Storage
+# ============================================================================
+# This is an alternative compose file that includes MinIO for S3-compatible
+# storage, making the stack fully self-hosted without external dependencies.
+# 
+# Usage:
+#   docker stack deploy -c docker-compose.papermark.yml \
+#                       -c docker-compose.minio.yml papermark
+# ============================================================================
+
+networks:
+  papermark_internal:
+    external: true
+
+volumes:
+  minio_data:
+    driver: local
+
+services:
+  # ==========================================================================
+  # MinIO - S3-Compatible Object Storage
+  # ==========================================================================
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    networks:
+      - papermark_internal
+      - traefik_public
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      MINIO_BROWSER: "on"
+      MINIO_DOMAIN: ${MINIO_API_DOMAIN:-}
+      MINIO_SERVER_URL: ${MINIO_API_URL:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        # MinIO API (S3 endpoint)
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik_public"
+        
+        # S3 API Router
+        - "traefik.http.routers.minio-api.rule=Host(`${MINIO_API_DOMAIN:-minio-api.yourdomain.com}`)"
+        - "traefik.http.routers.minio-api.entrypoints=websecure"
+        - "traefik.http.routers.minio-api.tls=true"
+        - "traefik.http.routers.minio-api.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.minio-api.service=minio-api"
+        - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
+        
+        # Console Router
+        - "traefik.http.routers.minio-console.rule=Host(`${MINIO_CONSOLE_DOMAIN:-minio.yourdomain.com}`)"
+        - "traefik.http.routers.minio-console.entrypoints=websecure"
+        - "traefik.http.routers.minio-console.tls=true"
+        - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.minio-console.service=minio-console"
+        - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+        
+        # Security Headers
+        - "traefik.http.middlewares.minio-headers.headers.customResponseHeaders.X-Frame-Options=SAMEORIGIN"
+        - "traefik.http.middlewares.minio-headers.headers.customResponseHeaders.X-Content-Type-Options=nosniff"
+        
+        # Apply middlewares
+        - "traefik.http.routers.minio-api.middlewares=minio-headers"
+        - "traefik.http.routers.minio-console.middlewares=minio-headers"
+      
+      placement:
+        constraints:
+          - node.labels.papermark.storage == true
+      
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+      
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================================
+  # MinIO Client (mc) - For bucket creation and management
+  # ==========================================================================
+  minio-client:
+    image: minio/mc:latest
+    networks:
+      - papermark_internal
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb myminio/papermark --ignore-existing;
+      /usr/bin/mc anonymous set download myminio/papermark;
+      /usr/bin/mc admin user add myminio ${MINIO_PAPERMARK_USER:-papermark} ${MINIO_PAPERMARK_PASSWORD:-papermark123};
+      /usr/bin/mc admin policy attach myminio readwrite --user ${MINIO_PAPERMARK_USER:-papermark};
+      echo 'MinIO setup complete';
+      exit 0;
+      "
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: none
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
