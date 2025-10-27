@@ -73,6 +73,7 @@ RUN if [ -f next.config.docker.js ]; then \
 # Set dummy values for build - real values come from environment at runtime
 ENV NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ENV NEXTAUTH_URL=http://localhost:3000
+ENV NEXT_PUBLIC_APP_BASE_HOST=http://localhost:3000
 ENV NEXT_PUBLIC_WEBHOOK_BASE_HOST=http://localhost:3000
 ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
 
