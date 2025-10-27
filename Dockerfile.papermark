@@ -33,6 +33,9 @@ RUN \
   else \
     echo "Lockfile not found." && exit 1; \
   fi
+# Debug:
+RUN ls -alFh
+
 
 # ============================================================================
 # Stage 2: Build
@@ -44,6 +47,9 @@ WORKDIR /app
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Debug:
+RUN ls -alFh
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
