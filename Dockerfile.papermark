@@ -73,6 +73,8 @@ ENV NEXT_PUBLIC_MARKETING_URL=http://localhost:3000
 ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
 ENV HANKO_API_KEY=123dummy
 ENV NEXT_PUBLIC_HANKO_TENANT_ID=dummy
+ENV SLACK_CLIENT_ID=dummy
+ENV SLACK_CLIENT_SECRET=dummy
 
 RUN \
   if [ -f yarn.lock ]; then \
