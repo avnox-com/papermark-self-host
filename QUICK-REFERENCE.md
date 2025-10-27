@@ -185,7 +185,7 @@ dig papermark.yourdomain.com
 2. **Manual**:
    ```bash
    docker service update --image \
-     ghcr.io/your-org/papermark:latest \
+     ghcr.io/avnox-com/papermark:latest \
      papermark_papermark
    ```
 
@@ -200,7 +200,7 @@ dig papermark.yourdomain.com
 
 - GitHub Issues: https://github.com/mfts/papermark/issues
 - Documentation: https://www.papermark.com/help
-- Your Deploy Repo: https://github.com/your-org/papermark-deploy
+- Your Deploy Repo: https://github.com/avnox-com/papermark-deploy
 
 ## 🎯 Next Steps After Deployment
 

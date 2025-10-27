@@ -2,7 +2,7 @@
 
 > 🚀 Complete Docker Swarm deployment solution for [Papermark](https://github.com/mfts/papermark) - the open-source DocSend alternative with built-in analytics and custom domains.
 
-[![Build & Push Papermark](https://github.com/your-org/papermark-deploy/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/your-org/papermark-deploy/actions/workflows/build-and-push.yml)
+[![Build & Push Papermark](https://github.com/avnox-com/papermark-deploy/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/avnox-com/papermark-deploy/actions/workflows/build-and-push.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## ✨ Features
@@ -45,7 +45,7 @@
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/your-org/papermark-deploy.git
+git clone https://github.com/avnox-com/papermark-deploy.git
 cd papermark-deploy
 ```
 
@@ -149,7 +149,7 @@ The GitHub Actions workflow automatically:
 REGISTRY=ghcr.io
 REGISTRY_USERNAME=your-github-username
 REGISTRY_PASSWORD=your-github-token
-IMAGE_PREFIX=ghcr.io/your-org
+IMAGE_PREFIX=ghcr.io/avnox-com
 
 # Optional
 REGISTRY_IP=10.0.0.1        # For private registry via WireGuard
@@ -248,7 +248,7 @@ docker stack deploy -c docker-compose.papermark.yml papermark
 git push origin main
 
 # Or manual
-docker service update --image ghcr.io/your-org/papermark:latest papermark_papermark
+docker service update --image ghcr.io/avnox-com/papermark:latest papermark_papermark
 ```
 
 ### Database Backups
@@ -361,7 +361,7 @@ Papermark itself is licensed under AGPL-3.0 - some features may require enterpri
 - [Papermark Official Website](https://www.papermark.com/)
 - [Papermark GitHub](https://github.com/mfts/papermark)
 - [Papermark Documentation](https://www.papermark.com/help)
-- [Report Issues](https://github.com/your-org/papermark-deploy/issues)
+- [Report Issues](https://github.com/avnox-com/papermark-deploy/issues)
 
 ## 🙏 Acknowledgments
 

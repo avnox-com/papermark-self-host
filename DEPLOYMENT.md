@@ -41,8 +41,8 @@ papermark.yourdomain.com    A     YOUR_SERVER_IP
 ### 1. Clone Your Repository
 
 ```bash
-git clone https://github.com/your-org/your-papermark-deploy.git
-cd your-papermark-deploy
+git clone https://github.com/avnox-com/papermark-self-host.git
+cd papermark-self-host
 ```
 
 ### 2. Configure Environment
@@ -242,7 +242,7 @@ ENABLE_ANALYTICS=true
 REGISTRY=ghcr.io
 REGISTRY_USERNAME=your-github-username
 REGISTRY_PASSWORD=your-github-token
-IMAGE_PREFIX=ghcr.io/your-org
+IMAGE_PREFIX=ghcr.io/avnox-com
 
 # Optional (for WireGuard):
 REGISTRY_IP=10.0.0.1
@@ -298,7 +298,7 @@ env:
 
 ```bash
 # Pull latest image
-docker service update --image ghcr.io/your-org/papermark:latest papermark_papermark
+docker service update --image ghcr.io/avnox-com/papermark:latest papermark_papermark
 
 # Or update entire stack
 docker stack deploy -c docker-compose.papermark.yml papermark
@@ -508,7 +508,7 @@ curl http://papermark.yourdomain.com/.well-known/acme-challenge/test
 3. **Regular updates:**
    ```bash
    # Update weekly
-   docker service update --image ghcr.io/your-org/papermark:latest papermark_papermark
+   docker service update --image ghcr.io/avnox-com/papermark:latest papermark_papermark
    ```
 
 4. **Monitor logs for suspicious activity**

@@ -117,7 +117,7 @@ services:
   # Papermark Application
   # ==========================================================================
   papermark:
-    image: ${PAPERMARK_IMAGE:-ghcr.io/your-org/papermark:latest}
+    image: ${PAPERMARK_IMAGE:-ghcr.io/avnox-com/papermark:latest}
     networks:
       - traefik_public
       - papermark_internal
