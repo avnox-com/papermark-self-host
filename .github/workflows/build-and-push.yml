@@ -8,9 +8,9 @@ on:
   workflow_dispatch: {}
 
 env:
-  REGISTRY: ${{ secrets.REGISTRY }} # e.g. ghcr.io
+  REGISTRY: ${{ secrets.REGISTRY || 'ghcr.io' }} # e.g. ghcr.io
   REGISTRY_IP: ${{ secrets.REGISTRY_IP }} # optional: pin host->IP through WG
-  IMAGE_PREFIX: ${{ secrets.IMAGE_PREFIX }} # e.g. ghcr.io/avnox-com
+  IMAGE_PREFIX: ${{ secrets.IMAGE_PREFIX || 'ghcr.io/avnox-com' }} # e.g. ghcr.io/avnox-com
   PAPERMARK_REPO: mfts/papermark
   PAPERMARK_REF: main
   PAPERMARK_PRS: "" # e.g. "123,456" (leave empty to skip)
