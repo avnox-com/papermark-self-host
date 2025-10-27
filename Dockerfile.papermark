@@ -7,7 +7,7 @@
 # Based on Next.js with PostgreSQL, S3-compatible storage, and Resend for email
 # ============================================================================
 
-ARG NODE_VERSION=18
+ARG NODE_VERSION=20
 ARG ALPINE_VERSION=3.19
 
 # ============================================================================

@@ -1,5 +1,5 @@
 // next.config.js override for Docker standalone builds
-// Place this in stacks/projects/papermark/ directory
+// Place this in papermark directory
 
 const nextConfig = {
   // Enable standalone output for Docker
