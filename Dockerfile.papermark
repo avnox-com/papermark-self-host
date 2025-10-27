@@ -22,9 +22,6 @@ WORKDIR /app
 COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
 COPY prisma ./prisma
 
-# Debug:
-RUN ls -alFh
-
 # Install dependencies based on the preferred package manager
 RUN \
   if [ -f yarn.lock ]; then \
@@ -50,9 +47,6 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Debug:
-RUN ls -alFh
-
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
@@ -77,6 +71,8 @@ ENV NEXT_PUBLIC_APP_BASE_HOST=http://localhost:3000
 ENV NEXT_PUBLIC_WEBHOOK_BASE_HOST=http://localhost:3000
 ENV NEXT_PUBLIC_MARKETING_URL=http://localhost:3000
 ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
+ENV HANKO_API_KEY=123dummy
+ENV NEXT_PUBLIC_HANKO_TENANT_ID=dummy
 
 RUN \
   if [ -f yarn.lock ]; then \
