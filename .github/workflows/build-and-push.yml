@@ -87,7 +87,7 @@ jobs:
 
       # -------- Optional: WireGuard setup --------
       - name: Install WireGuard tools (if needed)
-        if: ${{ USE_WG == true }}
+        if: ${{ env.USE_WG == true }}
         run: |
           set -o errexit -o pipefail -o nounset
 
@@ -107,7 +107,7 @@ jobs:
           wg --version || true
 
       - name: Configure & bring up WireGuard
-        if: ${{ USE_WG == true }}
+        if: ${{ env.USE_WG == true }}
         env:
           WG_CONF: ${{ secrets.WG_CONF }}
         run: |
@@ -145,7 +145,7 @@ jobs:
           docker push "${IMAGE_PREFIX}/papermark:latest"
 
       - name: Teardown WireGuard
-        if: always() && USE_WG
+        if: always() && env.USE_WG
         run: |
           sudo timeout 10s wg-quick down wg0 || true
 
