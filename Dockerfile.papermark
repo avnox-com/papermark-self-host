@@ -21,7 +21,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
-COPY prisma ./
+COPY prisma ./prisma
 
 # Debug:
 RUN ls -alFh
