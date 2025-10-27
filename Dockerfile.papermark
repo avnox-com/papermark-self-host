@@ -8,12 +8,11 @@
 # ============================================================================
 
 ARG NODE_VERSION=20
-ARG ALPINE_VERSION=3.22
 
 # ============================================================================
 # Stage 1: Dependencies
 # ============================================================================
-FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS deps
+FROM node:${NODE_VERSION}-alpine AS deps
 
 RUN apk add --no-cache libc6-compat openssl
 
@@ -43,7 +42,7 @@ RUN \
 # ============================================================================
 # Stage 2: Build
 # ============================================================================
-FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS builder
+FROM node:${NODE_VERSION}-alpine AS builder
 
 WORKDIR /app
 
@@ -90,7 +89,7 @@ RUN \
 # ============================================================================
 # Stage 3: Production Runtime
 # ============================================================================
-FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS runner
+FROM node:${NODE_VERSION}-alpine AS runner
 
 WORKDIR /app
 
