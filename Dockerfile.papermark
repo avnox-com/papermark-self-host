@@ -21,6 +21,10 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
+COPY prisma ./
+
+# Debug:
+RUN ls -alFh
 
 # Install dependencies based on the preferred package manager
 RUN \
@@ -33,8 +37,7 @@ RUN \
   else \
     echo "Lockfile not found." && exit 1; \
   fi
-# Debug:
-RUN ls -alFh
+
 
 
 # ============================================================================
