@@ -82,8 +82,8 @@ jobs:
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             NODE_VERSION=18
-          cache-from: type=gha,scope=papermark-app
-          cache-to: type=gha,mode=max,scope=papermark-app
+          cache-from: type=gha,scope=papermark-app-n20
+          cache-to: type=gha,mode=max,scope=papermark-app-n20
 
       # -------- Optional: WireGuard setup --------
       - name: Install WireGuard tools (if needed)
