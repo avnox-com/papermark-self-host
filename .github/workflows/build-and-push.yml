@@ -15,6 +15,7 @@ env:
   PAPERMARK_REF: main
   PAPERMARK_PRS: "" # e.g. "123,456" (leave empty to skip)
   WORKFLOW_TARGET_DIR: stacks/projects/papermark # no trailing slash
+  USE_WG: ${{ secrets.WG_CONF != '' }}
 
 jobs:
   build:
@@ -86,7 +87,7 @@ jobs:
 
       # -------- Optional: WireGuard setup --------
       - name: Install WireGuard tools (if needed)
-        if: ${{ secrets.WG_CONF != '' }}
+        if: ${{ USE_WG == true }}
         run: |
           set -o errexit -o pipefail -o nounset
 
@@ -106,7 +107,7 @@ jobs:
           wg --version || true
 
       - name: Configure & bring up WireGuard
-        if: ${{ secrets.WG_CONF != '' }}
+        if: ${{ USE_WG == true }}
         env:
           WG_CONF: ${{ secrets.WG_CONF }}
         run: |
@@ -144,7 +145,7 @@ jobs:
           docker push "${IMAGE_PREFIX}/papermark:latest"
 
       - name: Teardown WireGuard
-        if: always() && secrets.WG_CONF != ''
+        if: always() && USE_WG
         run: |
           sudo timeout 10s wg-quick down wg0 || true
 
