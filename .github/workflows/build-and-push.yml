@@ -14,7 +14,7 @@ env:
   PAPERMARK_REPO: mfts/papermark
   PAPERMARK_REF: main
   PAPERMARK_PRS: "" # e.g. "123,456" (leave empty to skip)
-  WORKFLOW_TARGET_DIR: "" # no trailing slash
+  WORKFLOW_TARGET_DIR: "." # no trailing slash
   USE_WG: ${{ secrets.WG_CONF != '' }}
 
 jobs:
