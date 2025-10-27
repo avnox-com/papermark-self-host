@@ -75,6 +75,7 @@ ENV NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ENV NEXTAUTH_URL=http://localhost:3000
 ENV NEXT_PUBLIC_APP_BASE_HOST=http://localhost:3000
 ENV NEXT_PUBLIC_WEBHOOK_BASE_HOST=http://localhost:3000
+ENV NEXT_PUBLIC_MARKETING_URL=http://localhost:3000
 ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy
 
 RUN \
