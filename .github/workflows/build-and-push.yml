@@ -73,7 +73,7 @@ jobs:
           context: ${{ env.WORKFLOW_TARGET_DIR }}/papermark-src
           file: ${{ env.WORKFLOW_TARGET_DIR }}/Dockerfile.papermark
           push: false
-          load: false
+          load: true
           tags: |
             ${{ env.IMAGE_PREFIX }}/papermark:sha-${{ steps.vars.outputs.sha }}
             ${{ env.IMAGE_PREFIX }}/papermark:latest
