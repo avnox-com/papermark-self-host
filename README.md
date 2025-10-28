@@ -2,7 +2,7 @@
 
 > 🚀 Complete Docker Swarm deployment solution for [Papermark](https://github.com/mfts/papermark) - the open-source DocSend alternative with built-in analytics and custom domains.
 
-[![Build & Push Papermark](https://github.com/avnox-com/papermark-deploy/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/avnox-com/papermark-deploy/actions/workflows/build-and-push.yml)
+[![Build & Push Papermark](https://github.com/avnox-com/papermark-self-host/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/avnox-com/papermark-self-host/actions/workflows/build-and-push.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## ✨ Features
@@ -45,8 +45,8 @@
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/avnox-com/papermark-deploy.git
-cd papermark-deploy
+git clone https://github.com/avnox-com/papermark-self-host.git
+cd papermark-self-host
 ```
 
 ### 2. Run Setup Script
@@ -361,7 +361,7 @@ Papermark itself is licensed under AGPL-3.0 - some features may require enterpri
 - [Papermark Official Website](https://www.papermark.com/)
 - [Papermark GitHub](https://github.com/mfts/papermark)
 - [Papermark Documentation](https://www.papermark.com/help)
-- [Report Issues](https://github.com/avnox-com/papermark-deploy/issues)
+- [Report Issues](https://github.com/avnox-com/papermark-self-host/issues)
 
 ## 🙏 Acknowledgments
 

@@ -62,7 +62,7 @@ make db-shell               # PostgreSQL shell
 ## 📁 Directory Structure
 
 ```
-papermark-deploy/
+papermark-self-host/
 ├── .github/workflows/
 │   └── build-and-push.yml       # CI/CD workflow
 ├── .env                         # Your configuration (create from .env.example)
@@ -200,7 +200,7 @@ dig papermark.yourdomain.com
 
 - GitHub Issues: https://github.com/mfts/papermark/issues
 - Documentation: https://www.papermark.com/help
-- Your Deploy Repo: https://github.com/avnox-com/papermark-deploy
+- Your Deploy Repo: https://github.com/avnox-com/papermark-self-host
 
 ## 🎯 Next Steps After Deployment
 

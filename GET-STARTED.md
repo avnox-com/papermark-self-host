@@ -18,7 +18,7 @@ This package includes a complete, production-ready deployment solution for Paper
 ## 📋 File Overview
 
 ```
-papermark-deploy/
+papermark-self-host/
 ├── 📄 README.md                       ← Start here! Full documentation
 ├── 📄 QUICK-REFERENCE.md              ← Command cheatsheet
 ├── 📄 DEPLOYMENT.md                   ← Detailed deployment guide
