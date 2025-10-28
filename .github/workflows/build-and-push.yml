@@ -131,7 +131,16 @@ jobs:
           echo "WireGuard status:"
           sudo wg show
 
+      - name: Docker login to GHCR
+        if: env.REGISTRY == 'ghcr.io'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Docker login
+        if: env.REGISTRY !== 'ghcr.io'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
