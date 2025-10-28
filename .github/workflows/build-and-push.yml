@@ -140,7 +140,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker login
-        if: ${{ env.REGISTRY !== 'ghcr.io' }}
+        if: ${{ env.REGISTRY != 'ghcr.io' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
